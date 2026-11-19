@@ -149,3 +149,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn trims_titles_and_defaults_completed_to_false() {
+        let input: TaskInput = serde_json::from_str(r#"{"title":"  Learn Kubernetes  "}"#).unwrap();
+        assert_eq!(validate(&input).unwrap(), "Learn Kubernetes");
+        assert!(!input.completed);
+    }
+
+    #[test]
+    fn rejects_blank_titles_with_bad_request() {
+        let input = TaskInput {
+            title: " \n\t ".into(),
+            completed: false,
+        };
+        let (status, Json(body)) = validate(&input).unwrap_err();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(body["error"], "Title must contain 1–200 characters");
+    }
+
+    #[test]
+    fn enforces_character_limit_for_unicode_titles() {
+        let mut input = TaskInput {
+            title: "界".repeat(200),
+            completed: true,
+        };
+        assert!(validate(&input).is_ok());
+        input.title.push('界');
+        assert_eq!(validate(&input).unwrap_err().0, StatusCode::BAD_REQUEST);
+    }
+}

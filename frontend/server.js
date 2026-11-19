@@ -69,7 +69,7 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(port, '0.0.0.0', () => console.log(`Frontend listening on port ${port}`));
+server.listen(port, '0.0.0.0', () => console.log(`Frontend listening on port ${server.address().port}`));
 for (const signal of ['SIGTERM', 'SIGINT']) {
   process.on(signal, () => {
     server.close(() => process.exit(0));
