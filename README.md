@@ -141,4 +141,4 @@ The cloud-controller-manager shown in the reference is for cloud-provider integr
 
 The frontend image runs `node server.js` on port 80. It serves the built React files and proxies `/api` requests to `http://backend:8080`. No extra runtime npm dependencies are needed. `PORT` and `BACKEND_URL` can override these defaults through environment variables.
 
-To run the production frontend directly after `npm run build`, use `PORT=8081 BACKEND_URL=http://localhost:8080 npm start` from the frontend directory.
+To run the production frontend directly after `npm run build`, use `PORT=8081 BACKEND_URL=http://localhost:8080 npm start` from the frontend directory. 
