@@ -1,0 +1,48 @@
+Local Minikube deployment: practice-1 — run commands one by one
+
+Cluster/profile: practice-1
+Application namespace: task-board
+These commands are for you to run; no cluster has been started by creating this file.
+
+1. Go to the project directory:
+cd ~/RISHAV/deploy-test-1
+
+2. Start or reuse the Minikube cluster:
+minikube start -p practice-1 --driver=docker
+
+3. Build the backend image:
+docker build -t tasks-backend:local ./backend
+
+4. Build the frontend image:
+docker build -t tasks-frontend:local ./frontend
+
+5. Load both images into Minikube:
+minikube -p practice-1 image load --daemon --overwrite=true tasks-backend:local
+minikube -p practice-1 image load --daemon --overwrite=true tasks-frontend:local
+
+6. Create the application resources:
+kubectl --context=practice-1 apply -f k8s/local.yaml
+
+If updating an existing deployment with rebuilt images, restart its pods:
+kubectl --context=practice-1 -n task-board rollout restart deployment/backend deployment/frontend
+
+7. Wait for all Deployments to become ready:
+kubectl --context=practice-1 -n task-board rollout status deployment/postgres --timeout=300s
+kubectl --context=practice-1 -n task-board rollout status deployment/backend --timeout=300s
+kubectl --context=practice-1 -n task-board rollout status deployment/frontend --timeout=300s
+
+8. Check the pods (expect three pods, each Running and 1/1 ready):
+kubectl --context=practice-1 -n task-board get pods
+
+9. Forward the frontend to your laptop:
+kubectl --context=practice-1 -n task-board port-forward service/frontend 8081:80
+
+Keep this terminal open. Open http://localhost:8081 in your browser.
+Ctrl+C stops forwarding, but leaves the application running.
+
+10. Optional: open the Dashboard in another terminal:
+minikube dashboard -p practice-1
+
+Select the task-board namespace. Keep the Dashboard terminal open.
+
+If localhost port 8081 is already in use, stop the previous port-forward with Ctrl+C, or use 8082:80 and open http://localhost:8082.
