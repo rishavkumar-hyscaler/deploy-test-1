@@ -1,87 +1,23 @@
+# Local learning values; tune using observed usage, not production sizing advice.
+# requests: capacity used for scheduling; limits: runtime usage ceiling.
+# CPU: 100m = 0.1 core. Memory/disk: Mi and Gi are binary units.
+# ephemeral-storage covers writable container files and logs, NOT images or PVC data.
+# Exceeding memory can cause OOM termination; CPU is throttled; disk can cause eviction.
+# Node CPU/RAM/disk are configured outside this file (Minikube / EKS node settings).
 apiVersion: v1
 kind: Namespace
 metadata:
   name: task-board
 ---
-# Disposable local practice credentials; independent of backend/.env.
-apiVersion: v1
-kind: Secret
-metadata:
-  name: database
-  namespace: task-board
-type: Opaque
-stringData:
-  POSTGRES_USER: tasks
-  POSTGRES_PASSWORD: local-practice-only
-  POSTGRES_DB: tasks
-  DATABASE_URL: postgres://tasks:local-practice-only@postgres:5432/tasks
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: postgres-data
-  namespace: task-board
-spec:
-  accessModes: [ReadWriteOnce]
-  resources:
-    requests:
-      storage: 1Gi
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: postgres
-  namespace: task-board
-spec:
-  replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app: postgres
-  template:
-    metadata:
-      labels:
-        app: postgres
-    spec:
-      containers:
-        - name: postgres
-          image: postgres:17-alpine
-          envFrom:
-            - secretRef:
-                name: database
-          ports:
-            - containerPort: 5432
-          readinessProbe:
-            exec:
-              command: [sh, -c, 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"']
-            periodSeconds: 5
-          volumeMounts:
-            - name: data
-              mountPath: /var/lib/postgresql/data
-      volumes:
-        - name: data
-          persistentVolumeClaim:
-            claimName: postgres-data
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: postgres
-  namespace: task-board
-spec:
-  selector:
-    app: postgres
-  ports:
-    - port: 5432
----
+# Create the database Secret from backend/.env before applying this file.
+# DATABASE_URL points to your external PostgreSQL database.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: backend
   namespace: task-board
 spec:
-  replicas: 1
+  replicas: 2 # Number of desired pods; frontend/backend can be scaled independently.
   selector:
     matchLabels:
       app: backend
@@ -90,14 +26,19 @@ spec:
       labels:
         app: backend
     spec:
-      initContainers:
-        - name: wait-for-postgres
-          image: postgres:17-alpine
-          command: [sh, -c, 'until pg_isready -h postgres -U tasks -d tasks; do sleep 2; done']
       containers:
         - name: backend
           image: tasks-backend:local
           imagePullPolicy: Never
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+              ephemeral-storage: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+              ephemeral-storage: "256Mi"
           env:
             - name: DATABASE_URL
               valueFrom:
@@ -129,7 +70,7 @@ metadata:
   name: frontend
   namespace: task-board
 spec:
-  replicas: 1
+  replicas: 2 # Number of desired pods; frontend/backend can be scaled independently.
   selector:
     matchLabels:
       app: frontend
@@ -142,6 +83,15 @@ spec:
         - name: frontend
           image: tasks-frontend:local
           imagePullPolicy: Never
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+              ephemeral-storage: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+              ephemeral-storage: "256Mi"
           ports:
             - containerPort: 80
           readinessProbe:

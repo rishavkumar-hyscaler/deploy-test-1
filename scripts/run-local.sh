@@ -61,16 +61,23 @@ for expected in tasks-backend:local tasks-frontend:local; do
     fi
 done
 
+stage="configuring database Secret"
+# kubectl imports the file at runtime; never print or commit the generated Secret.
+kubectl --context=minikube create namespace task-board --dry-run=client -o yaml | kubectl --context=minikube apply -f -
+kubectl --context=minikube -n task-board create secret generic database --from-env-file=backend/.env --dry-run=client -o yaml | kubectl --context=minikube apply -f -
+# Retain the old database volume, but remove the obsolete local database workload.
+kubectl --context=minikube -n task-board delete deployment/postgres service/postgres --ignore-not-found
+
 stage="deploying the app"
 kubectl --context=minikube apply -f k8s/local.yaml
 # Restart existing pods too, so rerunning uses the freshly loaded images.
 kubectl --context=minikube -n task-board rollout restart deployment/backend deployment/frontend
 stage="waiting for pods"
-for deployment in postgres backend frontend; do
+for deployment in backend frontend; do
     kubectl --context=minikube -n task-board rollout status "deployment/$deployment" --timeout=300s
 done
 kubectl --context=minikube -n task-board get pods
 
-printf '\nOpen http://localhost:8081. Keep this terminal open.\nCtrl+C stops forwarding; pods and database remain running.\n'
+printf '\nOpen http://localhost:8081. Keep this terminal open.\nCtrl+C stops forwarding; application pods remain running.\n'
 stage="forwarding localhost:8081 (check that this port is free)"
 kubectl --context=minikube -n task-board port-forward --address=127.0.0.1 service/frontend 8081:80
