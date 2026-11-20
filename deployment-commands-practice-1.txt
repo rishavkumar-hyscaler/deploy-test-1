@@ -20,18 +20,22 @@ docker build -t tasks-frontend:local ./frontend
 minikube -p practice-1 image load --daemon --overwrite=true tasks-backend:local
 minikube -p practice-1 image load --daemon --overwrite=true tasks-frontend:local
 
-6. Create the application resources:
+6. Import your environment file into a Kubernetes Secret, then deploy:
+# Run these commands yourself; do not share their generated Secret output.
+kubectl --context=practice-1 create namespace task-board --dry-run=client -o yaml | kubectl --context=practice-1 apply -f -
+kubectl --context=practice-1 -n task-board create secret generic database --from-env-file=backend/.env --dry-run=client -o yaml | kubectl --context=practice-1 apply -f -
+# Remove the old local database if present. Its PVC is kept to preserve old data.
+kubectl --context=practice-1 -n task-board delete deployment/postgres service/postgres --ignore-not-found
 kubectl --context=practice-1 apply -f k8s/local.yaml
 
 If updating an existing deployment with rebuilt images, restart its pods:
 kubectl --context=practice-1 -n task-board rollout restart deployment/backend deployment/frontend
 
 7. Wait for all Deployments to become ready:
-kubectl --context=practice-1 -n task-board rollout status deployment/postgres --timeout=300s
 kubectl --context=practice-1 -n task-board rollout status deployment/backend --timeout=300s
 kubectl --context=practice-1 -n task-board rollout status deployment/frontend --timeout=300s
 
-8. Check the pods (expect three pods, each Running and 1/1 ready):
+8. Check the pods (frontend/backend counts follow replicas in k8s/local.yaml):
 kubectl --context=practice-1 -n task-board get pods
 
 9. Forward the frontend to your laptop:
@@ -46,3 +50,7 @@ minikube dashboard -p practice-1
 Select the task-board namespace. Keep the Dashboard terminal open.
 
 If localhost port 8081 is already in use, stop the previous port-forward with Ctrl+C, or use 8082:80 and open http://localhost:8082.
+
+After changing backend/.env, rerun the Secret import and restart deployment/backend.
+The env file must use KEY=value entries supported by kubectl; do not use export or shell expansion.
+Use an unquoted DATABASE_URL value. Keep any provider-required SSL query parameters.
